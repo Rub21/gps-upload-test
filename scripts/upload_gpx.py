@@ -41,9 +41,13 @@ def load_tokens() -> list[dict]:
 
 
 def list_gpx() -> list[Path]:
+    only = os.environ.get("GPX_ONLY_FOLDERS")  # e.g. "identifiable" or "identifiable,private"
     files = sorted(GPX_DIR.rglob("*.gpx"))
+    if only:
+        keep = [s.strip() for s in only.split(",") if s.strip()]
+        files = [f for f in files if any(f"/{k}/" in str(f) for k in keep)]
     if not files:
-        sys.exit(f"no .gpx files found under {GPX_DIR}")
+        sys.exit(f"no .gpx files found under {GPX_DIR} (filter={only!r})")
     return files
 
 
