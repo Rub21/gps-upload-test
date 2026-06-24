@@ -2,7 +2,7 @@
 
 Upload random GPX traces to a dev OSM instance for testing.
 
-Target: `https://rub21.apis.dev.openstreetmap.org/`
+Target: `https://osm2.geocompas.org/`
 
 ## Steps
 
@@ -36,6 +36,15 @@ Target: `https://rub21.apis.dev.openstreetmap.org/`
    python -m venv .venv && source .venv/bin/activate
    pip install -r requirements.txt
    playwright install chromium
+   playwright install-deps chromium   # system libs (libnspr4, libnss3, ...)
+   ```
+
+   If `install-deps` fails to detect the distro, install the libs manually as root:
+   ```bash
+   apt-get update && apt-get install -y \
+     libnspr4 libnss3 libnssutil3 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
+     libcups2 libdrm2 libatspi2.0-0 libxcomposite1 libxdamage1 libxfixes3 \
+     libxrandr2 libgbm1 libxkbcommon0 libpango-1.0-0 libcairo2 libasound2
    ```
 
 5. **Configure** `.env`:
@@ -46,8 +55,16 @@ Target: `https://rub21.apis.dev.openstreetmap.org/`
 
 6. **Run**:
    ```bash
-   python scripts/get_tokens.py        # writes tokens.json
+   python3 scripts/get_tokens.py        # writes tokens.json
    python scripts/upload_gpx.py --per-user 5
+   ```
+
+   To generate a token for a **single user** (or a specific list), pass the
+   username(s) as arguments — without arguments it uses the full
+   `TEST_USER_PREFIX` / `TEST_USER_COUNT` range:
+   ```bash
+   python3 scripts/get_tokens_admin.py admin          # just "admin"
+   python3 scripts/get_tokens_admin.py mapper3 mapper7 # a specific list
    ```
 
    Progress is written to `state.jsonl` after each upload (status `ok` or `fail`). Re-running the script skips any `(user, gpx)` pair already marked `ok`, so you can stop and resume freely.
