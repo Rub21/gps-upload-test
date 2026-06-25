@@ -6,7 +6,7 @@ For each test user:
   3. Read the displayed authorization code (out-of-band redirect).
   4. Exchange the code for an access token at /oauth2/token.
 
-Writes the resulting {user, token} pairs to tokens.json.
+Writes a {username: token} mapping to tokens.json.
 """
 
 import json
@@ -101,14 +101,14 @@ def fetch_token(username: str, browser) -> dict | None:
 
 def main() -> int:
     users = [f"{PREFIX}{i}" for i in range(1, COUNT + 1)]
-    tokens: list[dict] = []
+    tokens: dict[str, str] = {}
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         try:
             for u in users:
                 entry = fetch_token(u, browser)
                 if entry:
-                    tokens.append(entry)
+                    tokens[entry["user"]] = entry["token"]
                     print(f"{u}: {entry['token'][:12]}...")
         finally:
             browser.close()

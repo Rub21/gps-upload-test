@@ -33,7 +33,7 @@ Target: `https://osm2.geocompas.org/`
 
 4. **Install**:
    ```bash
-   python -m venv .venv && source .venv/bin/activate
+   python3 -m venv .venv && source .venv/bin/activate
    pip install -r requirements.txt
    playwright install chromium
    playwright install-deps chromium   # system libs (libnspr4, libnss3, ...)
@@ -56,7 +56,7 @@ Target: `https://osm2.geocompas.org/`
 6. **Run**:
    ```bash
    python3 scripts/get_tokens.py        # writes tokens.json
-   python scripts/upload_gpx.py --per-user 5
+   python3 scripts/upload_gpx.py --per-user 5
    ```
 
    To generate a token for a **single user** (or a specific list), pass the

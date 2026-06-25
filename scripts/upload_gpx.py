@@ -37,7 +37,12 @@ DEFAULT_TOTAL = 0  # 0 = use per_user; >0 = cap total uploads across all users
 def load_tokens() -> list[dict]:
     if not TOKENS_FILE.exists():
         sys.exit(f"tokens file not found: {TOKENS_FILE}. Run get_tokens.py first.")
-    return json.loads(TOKENS_FILE.read_text())
+    raw = json.loads(TOKENS_FILE.read_text())
+    # New format (generate_token.rb): {username: token}.
+    # Old format: [{"user": ..., "token": ...}, ...]. Normalize to the latter.
+    if isinstance(raw, dict):
+        return [{"user": user, "token": token} for user, token in raw.items()]
+    return raw
 
 
 def list_gpx() -> list[Path]:
