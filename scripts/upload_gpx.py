@@ -26,7 +26,8 @@ GPX_DIR = Path(os.environ.get("GPX_DIR", ROOT / "data" / "gpx")).expanduser()
 TOKENS_FILE = ROOT / os.environ.get("TOKENS_FILE", "tokens.json")
 STATE_FILE = ROOT / os.environ.get("STATE_FILE", "state.jsonl")
 
-VISIBILITIES = ["private", "public", "trackable", "identifiable"]
+ALL_VISIBILITIES = ["private", "public", "trackable", "identifiable"]
+DEFAULT_VISIBILITIES = "trackable,identifiable"
 
 DEFAULT_PER_USER = 5
 DEFAULT_RATE_MIN = 3.0
@@ -54,6 +55,16 @@ def list_gpx() -> list[Path]:
     if not files:
         sys.exit(f"no .gpx files found under {GPX_DIR} (filter={only!r})")
     return files
+
+
+def parse_visibilities(raw: str) -> list[str]:
+    vis = [v.strip() for v in raw.split(",") if v.strip()]
+    bad = [v for v in vis if v not in ALL_VISIBILITIES]
+    if bad:
+        sys.exit(f"unknown visibility {bad}, allowed: {ALL_VISIBILITIES}")
+    if not vis:
+        sys.exit("no visibility given")
+    return vis
 
 
 def load_state() -> set[tuple[str, str]]:
@@ -129,6 +140,11 @@ def main() -> int:
     ap.add_argument("--total", type=int, default=DEFAULT_TOTAL, help="cap total uploads across all users (overrides --per-user)")
     ap.add_argument("--rate-min", type=float, default=DEFAULT_RATE_MIN, help=f"min seconds between uploads (default {DEFAULT_RATE_MIN})")
     ap.add_argument("--rate-max", type=float, default=DEFAULT_RATE_MAX, help=f"max seconds between uploads (default {DEFAULT_RATE_MAX})")
+    ap.add_argument(
+        "--visibilities",
+        default=os.environ.get("VISIBILITIES", DEFAULT_VISIBILITIES),
+        help=f"comma list picked at random per upload (default {DEFAULT_VISIBILITIES}; env VISIBILITIES)",
+    )
     ap.add_argument("--no-resume", action="store_true", help="ignore state.jsonl, re-upload everything")
     ap.add_argument("--seed", type=int, default=None)
     args = ap.parse_args()
@@ -136,6 +152,8 @@ def main() -> int:
         random.seed(args.seed)
     if args.rate_min < 0 or args.rate_max < args.rate_min:
         sys.exit("invalid rate range")
+
+    visibilities = parse_visibilities(args.visibilities)
 
     tokens = load_tokens()
     gpx_files = list_gpx()
@@ -148,14 +166,14 @@ def main() -> int:
     if not plan:
         print("nothing to do")
         return 0
-    print(f"plan: {len(plan)} uploads across {len(tokens)} users")
+    print(f"plan: {len(plan)} uploads across {len(tokens)} users, visibility from {visibilities}")
 
     ok = 0
     fail = 0
     for i, (entry, gpx) in enumerate(plan, 1):
         user = entry["user"]
         token = entry["token"]
-        vis = random.choice(VISIBILITIES)
+        vis = random.choice(visibilities)
         desc = f"test trace from {user}"
         tags = "test,gps-upload-test"
 

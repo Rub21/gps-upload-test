@@ -62,6 +62,19 @@ Progress goes to the state file after each upload (`ok` or `fail`). Re-running
 skips any `(user, gpx)` pair already marked `ok`, so you can stop and resume.
 Use `--no-resume` to start over.
 
+### Visibility
+
+Each upload picks one visibility at random from a list. The default is
+`trackable,identifiable`. Change it in the env file with `VISIBILITIES`, or per
+run:
+
+```bash
+python scripts/upload_gpx.py --visibilities identifiable
+python scripts/upload_gpx.py --visibilities private,public,trackable,identifiable
+```
+
+Allowed values: `private`, `public`, `trackable`, `identifiable`.
+
 ### Tokens
 
 By default `get_tokens.py` reads `mapper1..TEST_USER_COUNT`. Override the count
