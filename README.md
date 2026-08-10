@@ -2,20 +2,30 @@
 
 Upload random GPX traces to a dev OSM instance for testing.
 
-Target: `https://osm2.geocompas.org/`
+Targets:
+
+ - `osm2.geocompas.org`
+ - `gpsvisibility.apis.dev.openstreetmap.org`
+ - `gpxcompression.apis.dev.openstreetmap.org`
+ - `gpsdatabase.apis.dev.openstreetmap.org`
 
 ## Steps
 
-1. **Register users** at `/user/new`. Same password for all. Names from `TEST_USER_PREFIX` / `TEST_USER_COUNT`. Emails from `TEST_USER_EMAIL_BASE` (use `+alias` trick to keep one inbox).
+1. **Register users** at `/user/new`. Same password for all.
 
 2. **Register OAuth2 app** as admin user → OAuth 2 applications → Register new app.
    - Redirect URI: `urn:ietf:wg:oauth:2.0:oob`
    - Scopes: `read_prefs write_gpx read_gpx`
    - Save `client_id` and `client_secret`.
 
-3. **Get GPX samples** from `https://planet.osm.org/gps/`:
+3. **GPX samples.** A small set of sample traces is committed in `data/gpx/`, so
+   tests work right after clone — no download needed. This includes the
+   compression matrix (`*.gpx`, `*.gpx.gz`, `*.gpx.bz2`, `*.zip`, `*.tar`,
+   `*.tar.gz`, `*.tar.bz2`, single and multi-file) used by `upload_formats.py`.
+
+   For scale tests you can pull the full planet dump into the same folder. The
+   bulk subfolders are git-ignored, so they stay local:
    ```bash
-   mkdir -p data/gpx
    curl -L -O https://planet.osm.org/gps/gpx-planet-2013-04-09.tar.xz
    tar -xJf gpx-planet-2013-04-09.tar.xz -C data/gpx
    ```
@@ -53,21 +63,49 @@ Target: `https://osm2.geocompas.org/`
    # fill in client_id, client_secret, password, email base
    ```
 
+   One env file per instance. Each one sets its own `BASE_URL`, OAuth app, and
+   `TOKENS_FILE` / `STATE_FILE`, so instances never clobber each other:
+   ```
+   .env                  default
+   .env.gpxcompression    -> gpxcompression.apis.dev.openstreetmap.org
+   .env.gpsvisibility     -> gpsvisibility.apis.dev.openstreetmap.org
+   ```
+
 6. **Run**:
    ```bash
-   python3 scripts/get_tokens.py        # writes tokens.json
-   python3 scripts/upload_gpx.py --per-user 5
+   python scripts/get_tokens.py        # writes the tokens file
+   python scripts/upload_gpx.py --per-user 5
    ```
 
    To generate a token for a **single user** (or a specific list), pass the
    username(s) as arguments — without arguments it uses the full
    `TEST_USER_PREFIX` / `TEST_USER_COUNT` range:
    ```bash
-   python3 scripts/get_tokens_admin.py admin          # just "admin"
-   python3 scripts/get_tokens_admin.py mapper3 mapper7 # a specific list
+   python scripts/get_tokens_admin.py admin          # just "admin"
+   python scripts/get_tokens_admin.py mapper3 mapper7 # a specific list
    ```
 
-   Progress is written to `state.jsonl` after each upload (status `ok` or `fail`). Re-running the script skips any `(user, gpx)` pair already marked `ok`, so you can stop and resume freely.
+   **Pick an env file** with `--env` (default `.env`). All three scripts accept it:
+   ```bash
+   python scripts/get_tokens.py    --env .env.gpxcompression
+   python scripts/upload_gpx.py    --env .env.gpxcompression --per-user 5
+   python scripts/upload_formats.py --env .env.gpxcompression
+   ```
+   You can also set it once via the `APP_ENV_FILE` environment variable:
+   ```bash
+   export APP_ENV_FILE=.env.gpxcompression
+   python scripts/get_tokens.py
+   ```
+
+   **Fewer users.** By default `get_tokens.py` reads `mapper1..TEST_USER_COUNT`.
+   Override how many, or name them explicitly:
+   ```bash
+   python scripts/get_tokens.py --env .env.gpxcompression --count 2
+   python scripts/get_tokens.py --env .env.gpxcompression --users mapper1,mapper2
+   ```
+   The upload scripts just use whatever tokens exist in the tokens file.
+
+   Progress is written to the state file after each upload (status `ok` or `fail`). Re-running the script skips any `(user, gpx)` pair already marked `ok`, so you can stop and resume freely.
 
 ## Phased rollout
 

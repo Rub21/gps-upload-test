@@ -17,11 +17,11 @@ from pathlib import Path
 from urllib.parse import quote
 
 import requests
-from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
-ROOT = Path(__file__).resolve().parent.parent
-load_dotenv(ROOT / ".env")
+from envload import ROOT, load_env
+
+load_env()
 
 BASE = os.environ["BASE_URL"].rstrip("/")
 CLIENT_ID = os.environ["CLIENT_ID"]
@@ -100,7 +100,22 @@ def fetch_token(username: str, browser) -> dict | None:
 
 
 def main() -> int:
-    users = [f"{PREFIX}{i}" for i in range(1, COUNT + 1)]
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--count", type=int, default=COUNT, help=f"how many users {PREFIX}1..N (default {COUNT})")
+    ap.add_argument(
+        "--users",
+        default=os.environ.get("TEST_USERS"),
+        help="explicit comma list, e.g. mapper01,mapper02 (overrides --count; env TEST_USERS)",
+    )
+    args = ap.parse_args()
+
+    if args.users:
+        users = [u.strip() for u in args.users.split(",") if u.strip()]
+    else:
+        users = [f"{PREFIX}{i}" for i in range(1, args.count + 1)]
+
     tokens: dict[str, str] = {}
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)

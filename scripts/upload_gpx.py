@@ -16,10 +16,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
-from dotenv import load_dotenv
 
-ROOT = Path(__file__).resolve().parent.parent
-load_dotenv(ROOT / ".env")
+from envload import ROOT, load_env
+
+load_env()
 
 BASE = os.environ["BASE_URL"].rstrip("/")
 GPX_DIR = Path(os.environ.get("GPX_DIR", ROOT / "data" / "gpx")).expanduser()

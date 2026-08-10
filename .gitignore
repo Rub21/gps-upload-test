@@ -1,7 +1,18 @@
 .env
+.env.*
+!.env.example
 .venv/
 __pycache__/
 *.pyc
 tokens.json
+tokens.*.json
 state.jsonl
+state.*.jsonl
+
+# committed sample traces in data/gpx/ stay tracked.
+# only the bulk planet dump (huge) is ignored:
+data/gpx/identifiable/
+data/gpx/public/
+data/gpx/trackable/
+*.tar.xz
 data/gpx/
