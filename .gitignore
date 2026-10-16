@@ -16,3 +16,5 @@ data/gpx/public/
 data/gpx/trackable/
 *.tar.xz
 data/gpx/
+tokens-gpx-tracks.json
+*.log

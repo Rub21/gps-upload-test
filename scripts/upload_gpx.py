@@ -115,13 +115,16 @@ def build_plan(tokens: list[dict], gpx_files: list[Path], per_user: int, total: 
     if total > 0:
         per_user = (total + n_users - 1) // n_users  # ceil division
 
+    # A file is uploaded once: skip files that any user already uploaded, and deal the rest across users.
+    taken = {g for _, g in done}
+    available = [g for g in gpx_files if str(g) not in taken]
+    random.shuffle(available)
     picks: dict[str, list[Path]] = {}
-    for entry in tokens:
+    for i, entry in enumerate(tokens):
         user = entry["user"]
-        available = [g for g in gpx_files if (user, str(g)) not in done]
-        if len(available) < per_user:
-            print(f"warn: only {len(available)} unseen gpx for {user} (wanted {per_user})", file=sys.stderr)
-        picks[user] = random.sample(available, min(per_user, len(available)))
+        picks[user] = available[i::n_users][:per_user]
+        if len(picks[user]) < per_user:
+            print(f"warn: only {len(picks[user])} unseen gpx for {user} (wanted {per_user})", file=sys.stderr)
 
     plan: list[tuple[dict, Path]] = []
     for round_idx in range(per_user):

@@ -1,133 +1,60 @@
 # gps-upload-test
 
-Upload GPX traces to a dev OSM instance for testing.
-
-Targets:
-
-- `osm2.geocompas.org`
-- `gpsvisibility.apis.dev.openstreetmap.org`
-- `gpxcompression.apis.dev.openstreetmap.org`
-- `gpsdatabase.apis.dev.openstreetmap.org`
-
-## Setup
-
-**1. Register test users** at `/user/new`. Use the same password for all.
-
-**2. Register an OAuth2 app** as admin → OAuth 2 applications → Register new app.
-
-- Redirect URI: `urn:ietf:wg:oauth:2.0:oob`
-- Scopes: `read_prefs write_gpx read_gpx`
-- Save the `client_id` and `client_secret`.
-
-**3. Install**
+Upload GPX traces to a test OSM instance (osm-dev on the dev server by default).
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-playwright install chromium
-playwright install-deps chromium
+make setup                        # .venv, requirements, .env
+make tokens SLUG=gpx-tracks       # copies the user tokens from the osm-dev server
+make upload PER_USER=5            # 5 traces per user
 ```
 
-**4. Configure**
+`make` lists the targets. Progress is saved in the state file after each upload, so a run can stop and continue. `--no-resume` starts over.
+
+## Config
+
+`make setup` copies `.env.example` to `.env`. Only these are needed for osm-dev:
+
+| variable | what |
+|---|---|
+| `BASE_URL` | instance URL, for example `https://gpx-tracks.rub21.com` |
+| `SERVER` | where osm-dev runs, `root@ip`, or `local` for `../osm-dev` |
+| `GPX_DIR` | folder with the traces, default `./data/gpx` |
+| `GPX_ONLY_FOLDERS` | subfolders of `GPX_DIR` to use, default `identifiable` |
+| `VISIBILITIES` | picked at random per upload: `private`, `public`, `trackable`, `identifiable` |
+| `TOKENS_FILE` | default `./tokens.json` |
+| `STATE_FILE` | default `./state.jsonl` |
+
+One file per instance: `.env.gpx-tracks`, `.env.gpx-soft-delete`, each with its own `BASE_URL`, `SERVER` and `STATE_FILE`. Pass it with `ENV=`:
 
 ```bash
-cp .env.example .env
-# fill in client_id, client_secret, password, email base
+make tokens SLUG=gpx-soft-delete ENV=.env.gpx-soft-delete
+make upload TOTAL=100 ENV=.env.gpx-soft-delete
 ```
 
-One env file per instance. Each sets its own `BASE_URL`, OAuth app, and
-`TOKENS_FILE` / `STATE_FILE`, so instances never overwrite each other:
+`CLIENT_ID`, `CLIENT_SECRET`, `REDIRECT_URI`, `SCOPES`, `TEST_USERS` and `TEST_USER_PASSWORD` are only for instances that are not osm-dev, see below.
 
-```
-.env                 default
-.env.gpxcompression  -> gpxcompression.apis.dev.openstreetmap.org
-.env.gpsvisibility   -> gpsvisibility.apis.dev.openstreetmap.org
-```
+## Tokens
 
-Pick one with `--env` on any script, or set `APP_ENV_FILE` once:
+osm-dev creates OAuth tokens for `admin`, `Rub21`, `mapper1..3` on every start and writes them to `.tokens/<slug>.json`. `make tokens` copies that file here as `tokens.json`. osm-dev regenerates the tokens when a container is recreated, so run `make tokens` again after `make up`.
+
+For an instance that is not osm-dev (for example `*.apis.dev.openstreetmap.org`): register an OAuth 2 app there with redirect `urn:ietf:wg:oauth:2.0:oob` and scopes `read_prefs write_gpx read_gpx`, fill `CLIENT_ID`, `CLIENT_SECRET`, `TEST_USERS` and `TEST_USER_PASSWORD` in the env file, then:
 
 ```bash
-python scripts/upload_gpx.py --env .env.gpxcompression --per-user 5
-export APP_ENV_FILE=.env.gpxcompression
+.venv/bin/playwright install chromium
+.venv/bin/python3 scripts/get_tokens.py --env .env.other
 ```
 
-## Run
+## Traces
+
+Put GPX files in `data/gpx/<folder>/` (gitignored). Two ways to get real data:
 
 ```bash
-python scripts/get_tokens.py           # writes the tokens file
-python scripts/upload_gpx.py --per-user 5
-```
+# public points of a bbox from openstreetmap.org, 5 pages per tile
+.venv/bin/python3 scripts/fetch_bbox.py --name amsterdam --bbox 4.75,52.28,5.05,52.45 --pages 5
 
-Progress goes to the state file after each upload (`ok` or `fail`). Re-running
-skips any `(user, gpx)` pair already marked `ok`, so you can stop and resume.
-Use `--no-resume` to start over.
-
-### Visibility
-
-Each upload picks one visibility at random from a list. The default is
-`trackable,identifiable`. Change it in the env file with `VISIBILITIES`, or per
-run:
-
-```bash
-python scripts/upload_gpx.py --visibilities identifiable
-python scripts/upload_gpx.py --visibilities private,public,trackable,identifiable
-```
-
-Allowed values: `private`, `public`, `trackable`, `identifiable`.
-
-### Tokens
-
-By default `get_tokens.py` reads `mapper1..TEST_USER_COUNT`. Override the count
-or name the users:
-
-```bash
-python scripts/get_tokens.py --count 2
-python scripts/get_tokens.py --users mapper1,mapper2
-```
-
-For a single user (like `admin`), use `get_tokens_admin.py` and pass the
-usernames as arguments:
-
-```bash
-python scripts/get_tokens_admin.py admin
-python scripts/get_tokens_admin.py mapper3 mapper7
-```
-
-The upload scripts use whatever tokens exist in the tokens file.
-
-## GPX samples
-
-Sample traces are committed in `data/gpx/`, so tests work right after clone.
-This includes the compression matrix (`*.gpx`, `*.gpx.gz`, `*.gpx.bz2`, `*.zip`,
-`*.tar`, `*.tar.gz`, `*.tar.bz2`, single and multi-file) used by
-`upload_formats.py`:
-
-```bash
-python scripts/upload_formats.py
-```
-
-For scale tests, pull the full planet dump into the same folder. The bulk
-subfolders are git-ignored, so they stay local:
-
-```bash
+# the 2013 planet dump: identifiable/, public/ and trackable/
 curl -L -O https://planet.osm.org/gps/gpx-planet-2013-04-09.tar.xz
 tar -xJf gpx-planet-2013-04-09.tar.xz -C data/gpx
 ```
 
-The dump has `identifiable` (211,935), `public` (546,195), and `trackable`
-(66,381). There is no `private` — it is excluded from the public dump for
-privacy reasons. We only upload `identifiable/`; the rest is kept for reference.
-
-## Phased rollout
-
-`identifiable/` has ~212K traces. 10% of that (~21K uploads) at the default rate
-takes days, so start small:
-
-| Phase | Command | Uploads | Duration |
-|-------|---------|---------|----------|
-| Smoke | `--per-user 5` | 50 | ~5 min |
-| Small | `--per-user 50` | 500 | ~45 min |
-| Medium | `--total 5000` | 5,000 | ~8 h |
-
-Each phase reuses `state.jsonl`, so later runs continue where earlier ones
-stopped.
+`make upload` takes `PER_USER=N` or `TOTAL=N`. Each file is uploaded once, spread across the users. `make formats` uploads the compression matrix once (`gpx`, `gz`, `bz2`, `zip`, `tar`).
